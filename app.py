@@ -60,9 +60,15 @@ def load_model(_ml_df):
 st.sidebar.title("🚦 Parking Intelligence")
 st.sidebar.markdown("---")
 
+# DATA_PATH = st.sidebar.text_input(
+#     "Dataset CSV path",
+#     value="data/parking_violations.csv",
+#     help="Path to the HackerEarth dataset CSV"
+# )
+
 DATA_PATH = st.sidebar.text_input(
     "Dataset CSV path",
-    value="data/parking_violations.csv",
+    value="data/sample_parking_violations.csv",
     help="Path to the HackerEarth dataset CSV"
 )
 
@@ -101,14 +107,14 @@ if peak_only:
 # ── Navigation ────────────────────────────────────────────────────────────────
 page = st.sidebar.radio(
     "View",
-    ["📊 Overview", "🗺️ Heatmap", "🎯 Priority Zones", "⏰ Time Patterns",
-     "🔮 Predictions", "🔁 Repeat Offenders"],
+    ["Overview", "Heatmap", "Priority Zones", "Time Patterns",
+     "Predictions", "Repeat Offenders"],
 )
 
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — OVERVIEW
 # ═════════════════════════════════════════════════════════════════════════════
-if page == "📊 Overview":
+if page == "Overview":
     st.title("Bengaluru Parking Violation Intelligence")
     st.caption("AI-driven hotspot detection and enforcement prioritisation")
     st.markdown("---")

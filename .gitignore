@@ -14,8 +14,7 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# Large Dataset
-data/
+/data
 
 # Generated Outputs
 outputs/
