@@ -188,7 +188,7 @@ if page == "Overview":
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — HEATMAP
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "🗺️ Heatmap":
+elif page == "Heatmap":
     st.title("Violation Heatmap")
     st.caption("Intensity weighted by vehicle size. Red numbered markers = top 10 enforcement priorities.")
 
@@ -216,7 +216,7 @@ elif page == "🗺️ Heatmap":
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 3 — PRIORITY ZONES
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "🎯 Priority Zones":
+elif page == "Priority Zones":
     st.title("Enforcement Priority Zones")
     st.caption("Ranked by Congestion Impact Score (CIS) — accounts for violation density, vehicle size, peak hours, and response lag.")
 
@@ -267,7 +267,7 @@ elif page == "🎯 Priority Zones":
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 4 — TIME PATTERNS
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "⏰ Time Patterns":
+elif page == "Time Patterns":
     st.title("Violation Time Patterns")
 
     col1, col2 = st.columns(2)
@@ -323,7 +323,7 @@ elif page == "⏰ Time Patterns":
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 5 — PREDICTIONS
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "🔮 Predictions":
+elif page == "Predictions":
     st.title("Predictive Hotspot Forecasting")
     st.caption("XGBoost model predicts which zones will have high violations for a given time slot.")
 
@@ -386,7 +386,7 @@ elif page == "🔮 Predictions":
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 6 — REPEAT OFFENDERS
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "🔁 Repeat Offenders":
+elif page == "Repeat Offenders":
     st.title("Repeat Offender Analysis")
     st.caption("Vehicles with 3+ violations. These represent habitual violators who require targeted action.")
 
