@@ -49,7 +49,7 @@ def run_clustering(_exp_df):
 
 @st.cache_resource(show_spinner="Training predictive model...")
 def load_model(_ml_df):
-    from model import train_model
+    from src.model import train_model
     model_path = 'models/xgb_hotspot.pkl'
     if os.path.exists(model_path):
         return joblib.load(model_path), None
