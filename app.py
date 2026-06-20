@@ -47,6 +47,7 @@ def load_all(filepath):
 @st.cache_data(show_spinner="Running spatial clustering...")
 def run_clustering(_exp_df):
     df_h3 = assign_h3_cells(_exp_df, resolution=8)
+    
 
     df_clust = run_hdbscan(
         df_h3,
@@ -95,7 +96,7 @@ def get_filtered_results(
             pd.DataFrame(),
             pd.DataFrame()
         )
-
+    print("STARTING HDBSCAN")
     filtered_clusters = run_hdbscan(
         fdf,
         min_cluster_size=20
@@ -224,6 +225,7 @@ sel_station = st.sidebar.selectbox("Police station", stations)
 peak_only = st.sidebar.checkbox("Peak hours only (7–10am, 5–9pm)", value=False)
 
 # Apply filters
+print("BEFORE FILTERING")
 
 (
     fdf,
@@ -237,6 +239,7 @@ peak_only = st.sidebar.checkbox("Peak hours only (7–10am, 5–9pm)", value=Fal
     peak_only,
     df_h3
 )
+print("After FILTERING")
 
 if len(fdf) == 0:
     st.warning(
