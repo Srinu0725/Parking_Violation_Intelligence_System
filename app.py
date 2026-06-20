@@ -159,7 +159,16 @@ if not os.path.exists(DATA_PATH):
     st.info("Expected columns: id, latitude, longitude, vehicle_type, violation_type, created_datetime, etc.")
     st.stop()
 
+# df_raw, approved, exp = load_all(DATA_PATH)
+st.write("Loading complete")
+
 df_raw, approved, exp = load_all(DATA_PATH)
+
+st.write("Dataset loaded")
+st.write(exp.shape)
+
+st.stop()
+
 # df_h3, df_clust, profiles, repeats = run_clustering(exp)
 df_h3, df_clust, profiles, repeats = run_clustering(exp)
 
