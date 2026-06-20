@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 import joblib
 import os
 import sys
@@ -58,13 +57,23 @@ def run_clustering(_exp_df):
     repeats = get_repeat_offenders(df_clust, min_violations=3)
     return df_h3, df_clust, profiles, repeats
 
-@st.cache_data(show_spinner=False)
+# @st.cache_data(show_spinner=False)
+# def get_filtered_results(
+#     violation,
+#     vehicle,
+#     station,
+#     peak_only,
+#     _df_h3
+# ):
 def get_filtered_results(
     violation,
     vehicle,
     station,
     peak_only,
-    _df_h3
+    _df_h3,
+    _df_clust,
+    _profiles,
+    _repeats
 ):
 
     fdf = _df_h3.copy()
@@ -96,20 +105,31 @@ def get_filtered_results(
             pd.DataFrame(),
             pd.DataFrame()
         )
-    print("STARTING HDBSCAN")
-    filtered_clusters = run_hdbscan(
-        fdf,
-        min_cluster_size=20
-    )
+ 
 
-    filtered_profiles = build_cluster_profiles(
-        filtered_clusters
-    )
+    print("FILTERING PRECOMPUTED DATA")
 
-    filtered_repeats = get_repeat_offenders(
-        filtered_clusters,
-        min_violations=3
-    )
+    # keep only cluster rows that belong to filtered records
+    filtered_clusters = _df_clust.loc[
+        _df_clust.index.intersection(fdf.index)
+    ].copy()
+
+    if len(filtered_clusters) > 0:
+
+        filtered_profiles = build_cluster_profiles(
+            filtered_clusters
+        )
+
+        filtered_repeats = get_repeat_offenders(
+            filtered_clusters,
+            min_violations=3
+        )
+
+    else:
+
+        filtered_profiles = pd.DataFrame()
+
+        filtered_repeats = pd.DataFrame()
 
     return (
         fdf,
@@ -168,21 +188,65 @@ if not os.path.exists(DATA_PATH):
 # profiles = pd.read_parquet("data/profiles.parquet")
 # repeats = pd.read_parquet("data/repeats.parquet")
 
-
-df_raw, approved, exp = load_all(DATA_PATH)
-
-print("STEP 1")
+print("LOADING CACHE FILES")
 
 df_h3 = pd.read_parquet("data/df_h3.parquet")
-print("STEP 2")
+print("STEP 1")
 
 df_clust = pd.read_parquet("data/df_clust.parquet")
-print("STEP 3")
+print("STEP 2")
 
 profiles = pd.read_parquet("data/profiles.parquet")
-print("STEP 4")
+print("STEP 3")
 
 repeats = pd.read_parquet("data/repeats.parquet")
+print("STEP 4")
+
+exp = df_h3
+approved = df_h3
+df_raw = df_h3
+
+print("CACHE FILES LOADED")
+print(df_h3.shape)
+print(df_clust.shape)
+print(profiles.shape)
+print(repeats.shape)
+print(
+    "df_h3 MB:",
+    round(
+        df_h3.memory_usage(deep=True).sum()
+        / 1024**2,
+        2
+    )
+)
+
+print(
+    "df_clust MB:",
+    round(
+        df_clust.memory_usage(deep=True).sum()
+        / 1024**2,
+        2
+    )
+)
+
+print(
+    "profiles MB:",
+    round(
+        profiles.memory_usage(deep=True).sum()
+        / 1024**2,
+        2
+    )
+)
+
+print(
+    "repeats MB:",
+    round(
+        repeats.memory_usage(deep=True).sum()
+        / 1024**2,
+        2
+    )
+)
+
 print("STEP 5")
 
 # keep original index alignment
@@ -237,7 +301,10 @@ print("BEFORE FILTERING")
     sel_vehicle,
     sel_station,
     peak_only,
-    df_h3
+    df_h3,
+    df_clust,
+    profiles,
+    repeats
 )
 print("After FILTERING")
 
@@ -246,29 +313,6 @@ if len(fdf) == 0:
         "No records match the selected filters."
     )
     st.stop()
-# filtered_h3 = assign_h3_cells(fdf)
-
-# if len(filtered_h3) >= 20:
-
-#     filtered_clusters = run_hdbscan(
-#         filtered_h3,
-#         min_cluster_size=20
-#     )
-
-#     filtered_profiles = build_cluster_profiles(
-#         filtered_clusters
-#     )
-
-#     filtered_repeats = get_repeat_offenders(
-#         filtered_clusters,
-#         min_violations=3
-#     )
-
-# else:
-
-#     filtered_clusters = pd.DataFrame()
-#     filtered_profiles = pd.DataFrame()
-#     filtered_repeats = pd.DataFrame()
 
 
 
@@ -652,27 +696,28 @@ elif page == "Predictions":
                 how="left"
             )
 
+        # display_preds = preds.head(20).copy()
+        # display_preds = display_preds.dropna(
+        #         subset=["lat", "lon"]
+        #     )
+
+        # st.success(
+        #         f"Forecast generated for {sel_day} • {sel_bucket_label}"
+        #     )
         display_preds = preds.head(20).copy()
 
+        display_preds = display_preds.dropna(
+            subset=["lat", "lon"]
+        )
+
+        if display_preds.empty:
+            st.warning("No hotspot locations available.")
+            st.stop()
+
         st.success(
-                f"Forecast generated for {sel_day} • {sel_bucket_label}"
-            )
+            f"Forecast generated for {sel_day} • {sel_bucket_label}"
+        )
 
-        # Map
-        # import folium, streamlit.components.v1 as components
-        # m = folium.Map(location=[preds['lat'].mean(), preds['lon'].mean()],
-        #                zoom_start=12, tiles='CartoDB positron')
-        # for i, row in preds.iterrows():
-        #     folium.CircleMarker(
-        #         location=[row['lat'], row['lon']],
-        #         radius=int(row['hotspot_prob'] * 25) + 6,
-
-        #         # color='#d73027', fill=True, fill_color='#d73027',
-                
-        #         fill_opacity=float(row['hotspot_prob']),
-        #         tooltip=f"Risk: {row['hotspot_prob']:.0%} | {row['top_station']}",
-        #     ).add_to(m)
-        # components.html(m._repr_html_(), height=450)
         import folium
         import streamlit.components.v1 as components
 
@@ -723,10 +768,12 @@ elif page == "Predictions":
 
             🟢 Monitoring Zone (<98%)
             """)
+        
+        priority_counts_raw = preds["priority"].value_counts()
 
-        critical = (preds["priority"] == "Critical").sum()
-        high = (preds["priority"] == "High").sum()
-        medium = (preds["priority"] == "Medium").sum()
+        critical = priority_counts_raw.get("Critical", 0)
+        high = priority_counts_raw.get("High", 0)
+        medium = priority_counts_raw.get("Medium", 0)
 
         tow_trucks = critical
         officers = critical * 2
@@ -811,11 +858,14 @@ elif page == "Predictions":
             .mean() * 100
         )
         # top_zone = display_preds.iloc[0]["top_station"]
-        top_zone = (
-            filtered_profiles
-            .sort_values("cis_score", ascending=False)
-            .iloc[0]["top_station"]
-        )
+        if filtered_profiles.empty:
+            top_zone = "N/A"
+        else:
+            top_zone = (
+                filtered_profiles
+                .sort_values("cis_score", ascending=False)
+                .iloc[0]["top_station"]
+            )
 
         st.info(
             f"""
