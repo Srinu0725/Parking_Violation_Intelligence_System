@@ -129,6 +129,55 @@ def make_heatmap(approved_df: pd.DataFrame, cluster_profiles: pd.DataFrame,
     </div>
     """
     m.get_root().html.add_child(folium.Element(title_html))
+    legend_html = """
+    <div style="
+    position: fixed;
+    bottom: 50px;
+    right: 50px;
+    z-index: 9999;
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    font-size: 13px;
+    width: 220px;
+    ">
+
+    <b>Map Legend</b>
+    <hr style="margin:5px 0">
+
+    <div>
+    <span style="display:inline-block;width:15px;height:15px;
+    background:#d73027;border-radius:50%;"></span>
+    Top Priority Zone
+    </div>
+
+    <div style="margin-top:5px;">
+    <span style="display:inline-block;width:15px;height:15px;
+    background:#f46d43;border-radius:50%;"></span>
+    High Priority Zone
+    </div>
+
+    <div style="margin-top:5px;">
+    <span style="display:inline-block;width:15px;height:15px;
+    background:#74add1;border-radius:50%;"></span>
+    Hotspot Cluster
+    </div>
+
+    <div style="margin-top:5px;">
+    🔢 Numbered Markers = Top 10 Enforcement Zones
+    </div>
+
+    <div style="margin-top:8px;">
+    🔥 Heatmap = Violation Density
+    </div>
+
+    </div>
+    """
+
+    m.get_root().html.add_child(
+        folium.Element(legend_html)
+    )
 
     m.save(output_path)
     print(f"  Map saved to {output_path}")
@@ -153,16 +202,34 @@ def make_time_heatmap(approved_df: pd.DataFrame,
         hour_data.append(h_df[['latitude', 'longitude']].values.tolist())
         time_labels.append(f"{hour:02d}:00")
 
+    # HeatMapWithTime(
+    #     data=hour_data,
+    #     index=time_labels,
+    #     radius=12,
+    #     blur=15,
+    #     min_opacity=0.6,
+    #     gradient={0.2: '#4575b4', 0.5: '#fee090', 1.0: '#d73027'},
+    #     auto_play=True,
+    #     display_index=True,
+    # ).add_to(m)
+    print(
+        "Total points:",
+        sum(len(x) for x in hour_data)
+        )
     HeatMapWithTime(
-        data=hour_data,
+        hour_data,
         index=time_labels,
-        radius=12,
-        blur=15,
-        min_opacity=0.3,
-        gradient={0.2: '#4575b4', 0.5: '#fee090', 1.0: '#d73027'},
-        auto_play=True,
-        display_index=True,
+        radius=25,
+        auto_play=False,
+        max_opacity=0.8,
     ).add_to(m)
+    print("\nChecking hourly frames")
+
+    for hour in range(24):
+        print(
+            hour,
+            len(hour_data[hour])
+        )
 
     m.save(output_path)
     print(f"  Time heatmap saved to {output_path}")

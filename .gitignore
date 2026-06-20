@@ -14,8 +14,7 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-/data
-
+data/*.csv
 # Generated Outputs
 outputs/
 

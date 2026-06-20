@@ -45,9 +45,12 @@ PEAK_HOURS = list(range(7, 10)) + list(range(17, 21))
 
 
 def load_data(filepath: str) -> pd.DataFrame:
-    """Load raw CSV and return a clean working DataFrame."""
+    """Load raw parquet/csv and return a clean working DataFrame."""
     print(f"Loading data from {filepath}...")
-    df = pd.read_csv(filepath, low_memory=False)
+    if filepath.endswith(".parquet"):
+        df = pd.read_parquet(filepath)
+    else:
+        df = pd.read_csv(filepath, low_memory=False)
     print(f"  Raw shape: {df.shape}")
 
     # Drop fully null columns — confirmed from inspection
@@ -61,6 +64,12 @@ def load_data(filepath: str) -> pd.DataFrame:
 
     # Convert to IST (UTC+5:30)
     df['created_ist'] = df['created_datetime'].dt.tz_convert('Asia/Kolkata')
+    print("\nTimestamp Check")
+    print(
+        df[
+            ['created_datetime', 'created_ist']
+        ].head(10)
+)
 
     # Drop rows with invalid lat/lon (Bengaluru bounds)
     df = df[
@@ -69,6 +78,13 @@ def load_data(filepath: str) -> pd.DataFrame:
     ]
 
     print(f"  After geo filter: {df.shape}")
+    print("\nHour Distribution")
+    print(
+        df['created_ist']
+        .dt.hour
+        .value_counts()
+        .sort_index()
+    )
     return df
 
 

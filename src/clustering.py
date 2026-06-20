@@ -2,6 +2,16 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
+
+try:
+    import h3
+    HAS_H3 = True
+
+    print("H3 imported successfully")
+    print("latlng_to_cell exists:", hasattr(h3, "latlng_to_cell"))
+    print("geo_to_h3 exists:", hasattr(h3, "geo_to_h3"))
+except ImportError:
+    HAS_H3 = False
 try:
     import hdbscan
     HAS_HDBSCAN = True
@@ -9,39 +19,38 @@ except ImportError:
     HAS_HDBSCAN = False
     from sklearn.cluster import DBSCAN
 
-try:
-    import h3
-    HAS_H3 = True
-except ImportError:
-    HAS_H3 = False
-
 from src.preprocess import compute_congestion_impact_score
+def assign_h3_cells(
+    df: pd.DataFrame,
+    resolution: int = 8
+) -> pd.DataFrame:
 
-
-def assign_h3_cells(df: pd.DataFrame, resolution: int = 8) -> pd.DataFrame:
-    print("Columns:", df.columns.tolist())
-    """Assign H3 hex cell to each violation record."""
     if not HAS_H3:
         raise ImportError("Install h3: pip install h3")
-    df = df.copy()
-#     df['hex8'] = df.apply(
-#         lambda r: h3.latlng_to_cell(
-#     r['latitude'],
-#     r['longitude'],
-#     resolution
-# )
-    # )
-    print(type(df))
-    print(df.head())
-    def test_row(r):
-        # print("INDEX:", r.index.tolist()[:10])
-        # print("NAME:", r.name)
-        return "test"
 
-    df['hex8'] = df.apply(test_row, axis=1)
+    df = df.copy()
+
+    if hasattr(h3, "latlng_to_cell"):
+        df['hex8'] = [
+            h3.latlng_to_cell(lat, lon, resolution)
+            for lat, lon in zip(df['latitude'], df['longitude'])
+        ]
+    else:
+        df['hex8'] = [
+            h3.geo_to_h3(lat, lon, resolution)
+            for lat, lon in zip(df['latitude'], df['longitude'])
+        ]
+
+    print("Unique H3:", df['hex8'].nunique())
+
+    print(
+        df.groupby('hex8')
+          .size()
+          .sort_values(ascending=False)
+          .head(10)
+    )
 
     return df
-
 
 def run_hdbscan(df: pd.DataFrame, min_cluster_size: int = 40) -> pd.DataFrame:
     """
@@ -50,29 +59,33 @@ def run_hdbscan(df: pd.DataFrame, min_cluster_size: int = 40) -> pd.DataFrame:
     Returns df with 'cluster' column (-1 = noise/outlier).
     """
     df = df.copy()
-    coords = np.radians(df[['latitude', 'longitude']].values)
 
-    if HAS_HDBSCAN:
-        clusterer = hdbscan.HDBSCAN(
-            min_cluster_size=min_cluster_size,
-            min_samples=10,
-            metric='haversine',
-            cluster_selection_epsilon=0.0005,  # ~50m
-            core_dist_n_jobs=-1,
-        )
-        df['cluster'] = clusterer.fit_predict(coords)
-        df['cluster_prob'] = clusterer.probabilities_
-    else:
-        # Fallback to DBSCAN if hdbscan not installed
-        # eps=0.0005 radians ≈ 50m on earth surface
-        clusterer = DBSCAN(eps=0.0005, min_samples=10, metric='haversine', n_jobs=-1)
-        df['cluster'] = clusterer.fit_predict(coords)
-        df['cluster_prob'] = (df['cluster'] >= 0).astype(float)
+    coords = np.radians(
+        df[['latitude', 'longitude']].values
+    )
 
-    n_clusters = df[df['cluster'] >= 0]['cluster'].nunique()
-    noise_pct = (df['cluster'] == -1).mean() * 100
-    print(f"  Clusters found: {n_clusters}")
-    print(f"  Noise points: {noise_pct:.1f}%")
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        min_samples=5,
+        metric='haversine'
+    )
+
+    df['cluster'] = clusterer.fit_predict(coords)
+
+    print(df['cluster'].value_counts().head(20))
+
+    print(
+        "Clusters:",
+        df[df['cluster'] != -1]['cluster'].nunique()
+    )
+
+    print(
+        "Noise:",
+        (df['cluster'] == -1).mean()
+    )
+    print(type(df))
+    print(df.shape)
+
     return df
 
 
