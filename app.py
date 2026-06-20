@@ -46,7 +46,15 @@ def load_all(filepath):
 
 @st.cache_data(show_spinner="Running spatial clustering...")
 def run_clustering(_exp_df):
-    df_h3 = assign_h3_cells(_exp_df, resolution=8)
+    # df_h3 = assign_h3_cells(_exp_df, resolution=8)
+    st.write("Starting H3 assignment")
+
+    df_h3 = assign_h3_cells(exp, resolution=8)
+
+    st.write("H3 complete")
+    st.write(df_h3.shape)
+
+    st.stop()
     df_clust = run_hdbscan(df_h3, min_cluster_size=40)
     profiles = build_cluster_profiles(df_clust)
     repeats = get_repeat_offenders(df_clust, min_violations=3)
@@ -159,16 +167,7 @@ if not os.path.exists(DATA_PATH):
     st.info("Expected columns: id, latitude, longitude, vehicle_type, violation_type, created_datetime, etc.")
     st.stop()
 
-# df_raw, approved, exp = load_all(DATA_PATH)
-st.write("Loading complete")
-
 df_raw, approved, exp = load_all(DATA_PATH)
-
-st.write("Dataset loaded")
-st.write(exp.shape)
-
-st.stop()
-
 # df_h3, df_clust, profiles, repeats = run_clustering(exp)
 df_h3, df_clust, profiles, repeats = run_clustering(exp)
 
