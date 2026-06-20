@@ -143,21 +143,13 @@ def load_model(_ml_df):
 st.sidebar.title("🚦 Parking Intelligence")
 st.sidebar.markdown("---")
 
-# DATA_PATH = st.sidebar.text_input(
-#     "Dataset CSV path",
-#     value="data/parking_violations.csv",
-#     help="Path to the HackerEarth dataset CSV"
-# )
+
 DATA_PATH = st.sidebar.text_input(
     "Dataset path",
     value="data/parking_violations.parquet"
 )
 
-# DATA_PATH = st.sidebar.text_input(
-#     "Dataset CSV path",
-#     value="data/sample_parking_violations.csv",
-#     help="Path to the HackerEarth dataset CSV"
-# )
+
 
 if not os.path.exists(DATA_PATH):
     st.error(f"Dataset not found at `{DATA_PATH}`. Update the path in the sidebar.")
@@ -168,12 +160,29 @@ if not os.path.exists(DATA_PATH):
 # df_h3, df_clust, profiles, repeats = run_clustering(exp)
 # df_h3, df_clust, profiles, repeats = run_clustering(exp)
 
+# df_raw, approved, exp = load_all(DATA_PATH)
+
+# df_h3 = pd.read_parquet("data/df_h3.parquet")
+# df_clust = pd.read_parquet("data/df_clust.parquet")
+# profiles = pd.read_parquet("data/profiles.parquet")
+# repeats = pd.read_parquet("data/repeats.parquet")
+
+
 df_raw, approved, exp = load_all(DATA_PATH)
 
+print("STEP 1")
+
 df_h3 = pd.read_parquet("data/df_h3.parquet")
+print("STEP 2")
+
 df_clust = pd.read_parquet("data/df_clust.parquet")
+print("STEP 3")
+
 profiles = pd.read_parquet("data/profiles.parquet")
+print("STEP 4")
+
 repeats = pd.read_parquet("data/repeats.parquet")
+print("STEP 5")
 
 # keep original index alignment
 df_h3 = df_h3.sort_index()
