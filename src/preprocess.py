@@ -45,12 +45,15 @@ PEAK_HOURS = list(range(7, 10)) + list(range(17, 21))
 
 
 def load_data(filepath: str) -> pd.DataFrame:
-    """Load raw parquet/csv and return a clean working DataFrame."""
+
     print(f"Loading data from {filepath}...")
+
     if filepath.endswith(".parquet"):
         df = pd.read_parquet(filepath)
+
     else:
         df = pd.read_csv(filepath, low_memory=False)
+
     print(f"  Raw shape: {df.shape}")
 
     # Drop fully null columns — confirmed from inspection
