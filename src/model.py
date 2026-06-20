@@ -72,9 +72,7 @@ def build_ml_dataset(df: pd.DataFrame) -> pd.DataFrame:
         ["hex8", "date", "hour_bucket"]
     ).reset_index(drop=True)
 
-    # ==========================
-    # TEMPORAL FEATURES
-    # ==========================
+
 
     agg["lag_1d"] = (
         agg.groupby(["hex8", "hour_bucket"])["violation_count"]
@@ -105,9 +103,7 @@ def build_ml_dataset(df: pd.DataFrame) -> pd.DataFrame:
         .fillna(0)
     )
 
-    # ==========================
-    # SPATIAL BEHAVIOUR FEATURES
-    # ==========================
+ 
 
     agg["hex_violation_mean"] = (
         agg.groupby("hex8")["violation_count"]

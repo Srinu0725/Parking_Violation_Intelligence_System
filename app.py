@@ -112,14 +112,7 @@ def get_filtered_results(
         filtered_repeats
     )
 
-@st.cache_resource(show_spinner="Training predictive model...")
-# def load_model(_ml_df):
-#     from src.model import train_model
-#     model_path = 'models/xgb_hotspot.pkl'
-#     if os.path.exists(model_path):
-#         return joblib.load(model_path), None
-#     model, metrics = train_model(_ml_df, model_path)
-#     return model, metrics
+
 @st.cache_resource(show_spinner="Training predictive model...")
 def load_model(_ml_df):
 
