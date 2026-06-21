@@ -52,19 +52,44 @@ def run_clustering(_exp_df):
         df_h3,
         min_cluster_size=40
     )
-    # df_clust = run_hdbscan(df_h3, min_cluster_size=40)
     profiles = build_cluster_profiles(df_clust)
     repeats = get_repeat_offenders(df_clust, min_violations=3)
     return df_h3, df_clust, profiles, repeats
+@st.cache_data(show_spinner=False)
+def get_heatmap_html(fdf, profiles):
 
-# @st.cache_data(show_spinner=False)
-# def get_filtered_results(
-#     violation,
-#     vehicle,
-#     station,
-#     peak_only,
-#     _df_h3
-# ):
+    map_path = "outputs/heatmap.html"
+
+    make_heatmap(
+        fdf,
+        profiles,
+        map_path
+    )
+
+    with open(
+        map_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        return f.read()
+
+@st.cache_data(show_spinner=False)
+def get_time_heatmap_html(fdf):
+
+    path = "outputs/time_heatmap.html"
+
+    make_time_heatmap(
+        fdf,
+        path
+    )
+
+    with open(
+        path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        return f.read()
+
 def get_filtered_results(
     violation,
     vehicle,
@@ -76,19 +101,23 @@ def get_filtered_results(
     _repeats
 ):
 
-    fdf = _df_h3.copy()
+    fdf = _df_h3
+
+    mask = pd.Series(True, index=_df_h3.index)
 
     if violation != "All":
-        fdf = fdf[fdf["violation_list"] == violation]
+        mask &= (_df_h3["violation_list"] == violation)
 
     if vehicle != "All":
-        fdf = fdf[fdf["vehicle_type"] == vehicle]
+        mask &= (_df_h3["vehicle_type"] == vehicle)
 
     if station != "All":
-        fdf = fdf[fdf["police_station"] == station]
+        mask &= (_df_h3["police_station"] == station)
 
     if peak_only:
-        fdf = fdf[fdf["is_peak"] == 1]
+        mask &= (_df_h3["is_peak"] == 1)
+
+    fdf = _df_h3.loc[mask]
 
     if len(fdf) == 0:
         return (
@@ -106,30 +135,27 @@ def get_filtered_results(
             pd.DataFrame()
         )
  
-
-    print("FILTERING PRECOMPUTED DATA")
-
     # keep only cluster rows that belong to filtered records
     filtered_clusters = _df_clust.loc[
         _df_clust.index.intersection(fdf.index)
-    ].copy()
+    ]
 
-    if len(filtered_clusters) > 0:
+    filtered_profiles = _profiles.copy()
+    filtered_repeats = _repeats.copy()
 
-        filtered_profiles = build_cluster_profiles(
-            filtered_clusters
-        )
+    if vehicle != "All":
+        filtered_profiles = filtered_profiles[
+            filtered_profiles["top_vehicle"] == vehicle
+        ]
 
-        filtered_repeats = get_repeat_offenders(
-            filtered_clusters,
-            min_violations=3
-        )
+        filtered_repeats = filtered_repeats[
+            filtered_repeats["vehicle_type"] == vehicle
+        ]
 
-    else:
-
-        filtered_profiles = pd.DataFrame()
-
-        filtered_repeats = pd.DataFrame()
+    if station != "All":
+        filtered_profiles = filtered_profiles[
+            filtered_profiles["top_station"] == station
+        ]
 
     return (
         fdf,
@@ -137,7 +163,37 @@ def get_filtered_results(
         filtered_profiles,
         filtered_repeats
     )
+@st.cache_data(show_spinner=False)
+def load_cached_files():
 
+    df_h3 = pd.read_parquet("data/df_h3.parquet")
+    df_clust = pd.read_parquet("data/df_clust.parquet")
+    profiles = pd.read_parquet("data/profiles.parquet")
+    repeats = pd.read_parquet("data/repeats.parquet")
+
+    return df_h3, df_clust, profiles, repeats
+
+@st.cache_data(show_spinner=False)
+def build_hex_locations(df):
+
+    return (
+        df.groupby("hex8")
+        .agg(
+            lat=("latitude", "mean"),
+            lon=("longitude", "mean"),
+            top_station=(
+                "police_station",
+                lambda x: x.mode().iloc[0]
+                if not x.mode().empty
+                else "Unknown"
+            )
+        )
+        .reset_index()
+    )
+
+@st.cache_data(show_spinner=False)
+def load_ml_dataset(df):
+    return build_ml_dataset(df)
 
 @st.cache_resource(show_spinner="Training predictive model...")
 def load_model(_ml_df):
@@ -177,30 +233,17 @@ if not os.path.exists(DATA_PATH):
     st.info("Expected columns: id, latitude, longitude, vehicle_type, violation_type, created_datetime, etc.")
     st.stop()
 
-# df_raw, approved, exp = load_all(DATA_PATH)
-# df_h3, df_clust, profiles, repeats = run_clustering(exp)
-# df_h3, df_clust, profiles, repeats = run_clustering(exp)
 
-# df_raw, approved, exp = load_all(DATA_PATH)
 
-# df_h3 = pd.read_parquet("data/df_h3.parquet")
-# df_clust = pd.read_parquet("data/df_clust.parquet")
-# profiles = pd.read_parquet("data/profiles.parquet")
-# repeats = pd.read_parquet("data/repeats.parquet")
-
-print("LOADING CACHE FILES")
-
-df_h3 = pd.read_parquet("data/df_h3.parquet")
-print("STEP 1")
-
-df_clust = pd.read_parquet("data/df_clust.parquet")
-print("STEP 2")
-
-profiles = pd.read_parquet("data/profiles.parquet")
-print("STEP 3")
-
-repeats = pd.read_parquet("data/repeats.parquet")
-print("STEP 4")
+df_h3, df_clust, profiles, repeats = load_cached_files()
+HEX_LOCS = build_hex_locations(df_h3)
+for col in [
+    "vehicle_type",
+    "violation_list",
+    "police_station"
+]:
+    if col in df_h3.columns:
+        df_h3[col] = df_h3[col].astype("category")
 
 exp = df_h3
 approved = df_h3
@@ -251,6 +294,7 @@ print("STEP 5")
 
 # keep original index alignment
 df_h3 = df_h3.sort_index()
+df_clust = df_clust.sort_index()
 # Sidebar filters
 st.sidebar.markdown("### Filters")
 violation_types = ['All'] + sorted(exp['violation_list'].dropna().unique().tolist())
@@ -406,31 +450,25 @@ elif page == "Heatmap":
     st.caption("Intensity weighted by vehicle size. Red numbered markers = top 10 enforcement priorities.")
 
     map_path = "outputs/heatmap.html"
-    # if not os.path.exists(map_path):
-    #     with st.spinner("Generating map..."):
-    #         os.makedirs("outputs", exist_ok=True)
-    #         # make_heatmap(approved, profiles, map_path)
-    #         make_heatmap(
-    #             fdf,
-    #             filtered_profiles,
-    #             map_path
-            # )
-    with st.spinner("Generating map..."):
-        os.makedirs("outputs", exist_ok=True)
-        if filtered_profiles.empty:
-            st.warning("No hotspot clusters found for selected filters.")
-            st.stop()
-
-        make_heatmap(
-            fdf,
-            filtered_profiles,
-            map_path
+  
+    if filtered_profiles.empty:
+        st.warning(
+            "No hotspot clusters found for selected filters."
         )
-    with open(map_path, 'r', encoding='utf-8') as f:
-        map_html = f.read()
+        st.stop()
 
-    components.html(map_html, height=600, scrolling=False)
+    map_html = get_heatmap_html(
+        fdf,
+        filtered_profiles
+)
 
+    # components.html(map_html, height=600, scrolling=False)
+
+    st.components.v1.html(
+        map_html,
+        height=600,
+        scrolling=False
+    )
     st.markdown("---")
 
     st.subheader("Violation density by hour of day")
@@ -446,15 +484,9 @@ elif page == "Heatmap":
 
     time_map_path = "outputs/time_heatmap.html"
 
-    with st.spinner("Generating time animation..."):
-        make_time_heatmap(
-            fdf,
-            time_map_path
-        )
-
-
-    with open(time_map_path, 'r', encoding='utf-8') as f:
-        t_html = f.read()
+    t_html = get_time_heatmap_html(
+    fdf
+)
     components.html(t_html, height=500, scrolling=False)
 
 
@@ -590,7 +622,7 @@ elif page == "Predictions":
     """
 )
 
-    ml_df = build_ml_dataset(df_h3)
+    ml_df = load_ml_dataset(df_h3)
     model, metrics = load_model(ml_df)
 
     # if metrics:
@@ -678,32 +710,15 @@ elif page == "Predictions":
 
         preds = generate_patrol_recommendations(preds)
 
-        hex_locs = (
-                df_h3.groupby("hex8")
-                .agg(
-                    lat=("latitude", "mean"),
-                    lon=("longitude", "mean"),
-                    # top_station=("police_station", lambda x: x.mode()[0])
-                    top_station=("police_station",
-             lambda x: x.mode().iloc[0] if not x.mode().empty else "Unknown")
-                )
-                .reset_index()
-            )
+     
 
         preds = preds.merge(
-                hex_locs,
+                HEX_LOCS,
                 on="hex8",
                 how="left"
             )
 
-        # display_preds = preds.head(20).copy()
-        # display_preds = display_preds.dropna(
-        #         subset=["lat", "lon"]
-        #     )
-
-        # st.success(
-        #         f"Forecast generated for {sel_day} • {sel_bucket_label}"
-        #     )
+   
         display_preds = preds.head(20).copy()
 
         display_preds = display_preds.dropna(
