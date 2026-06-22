@@ -724,6 +724,16 @@ elif page == "Predictions":
         display_preds = display_preds.dropna(
             subset=["lat", "lon"]
         )
+        
+        st.session_state["preds"] = preds
+        st.session_state["display_preds"] = display_preds
+        st.session_state["sel_bucket_label"] = sel_bucket_label
+        
+    if "preds" in st.session_state:
+
+        preds = st.session_state["preds"]
+        display_preds = st.session_state["display_preds"]
+        sel_bucket_label = st.session_state["sel_bucket_label"]
 
         if display_preds.empty:
             st.warning("No hotspot locations available.")
@@ -790,9 +800,9 @@ elif page == "Predictions":
         high = priority_counts_raw.get("High", 0)
         medium = priority_counts_raw.get("Medium", 0)
 
-        tow_trucks = critical
-        officers = critical * 2
-        patrol_units = high
+        tow_trucks = critical * 2 + high
+        officers = critical * 4 + high * 2
+        patrol_units = max(1, critical + high)
         monitor_zones = medium
 
         c1, c2, c3, c4 = st.columns(4)
@@ -929,6 +939,326 @@ elif page == "Predictions":
             ],
             width="stretch"
         )
+        st.markdown("---")
+        st.subheader("AI Resource Recommendation")
+
+        recommended_officers = (
+            critical * 4
+            + high * 2
+            + medium * 1
+        )
+
+        recommended_tows = (
+            critical * 2
+            + high * 1
+        )
+
+        recommended_patrols = max(
+            1,
+            int(np.ceil(recommended_officers / 4))
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+            "Recommended Officers",
+            recommended_officers
+        )
+
+        c2.metric(
+            "Recommended Patrol Vehicles",
+            recommended_patrols
+        )
+
+        c3.metric(
+            "Recommended Tow Trucks",
+            recommended_tows
+        )
+        st.markdown("---")
+        st.subheader("Available Resources")
+        c1, c2, c3 = st.columns(3)
+
+        available_officers = c1.number_input(
+            "Traffic Officers Available",
+            min_value=0,
+            value=min(recommended_officers, 50)
+        )
+
+        available_patrols = c2.number_input(
+            "Patrol Vehicles Available",
+            min_value=0,
+            value=min(recommended_patrols, 10)
+        )
+
+        available_tows = c3.number_input(
+            "Tow Trucks Available",
+            min_value=0,
+            value=min(recommended_tows, 5)
+        )
+        if st.button("🚔 Generate Deployment Plan"):
+            weights = {
+            "Critical": 5,
+            "High": 3,
+            "Medium": 1
+        }
+
+            deployment = display_preds.copy()
+            deployment = deployment.sort_values(
+            "hotspot_prob",
+            ascending=False
+            )
+
+            deployment["Deployment Rank"] = range(
+                1,
+                len(deployment) + 1
+            )
+
+            deployment["weight"] = deployment["priority"].map(weights)
+            total_weight = deployment["weight"].sum()
+
+            deployment["allocated_officers"] = (
+                deployment["weight"]
+                / total_weight
+                * available_officers
+            ).round().astype(int)
+
+            deployment["allocated_tows"] = (
+            deployment["weight"]
+            / total_weight
+            * available_tows
+            ).round().astype(int)
+
+            deployment["allocated_patrols"] = (
+                deployment["weight"]
+                / total_weight
+                * available_patrols
+            ).round().astype(int)
+
+            diff = (
+                available_officers
+                - deployment["allocated_officers"].sum()
+            )
+
+            deployment.loc[
+                deployment["allocated_officers"].idxmax(),
+                "allocated_officers"
+            ] += diff
+
+            diff = (
+                available_tows
+                - deployment["allocated_tows"].sum()
+            )
+
+
+
+            deployment.loc[
+                deployment["allocated_tows"].idxmax(),
+                "allocated_tows"
+            ] += diff 
+
+            diff = (
+                    available_patrols
+                    - deployment["allocated_patrols"].sum()
+                        )
+
+            deployment.loc[
+                deployment["allocated_patrols"].idxmax(),
+                "allocated_patrols"
+            ] += diff
+
+            deployment["deployment_window"] = sel_bucket_label
+
+
+
+            coverage_officers = (
+            available_officers
+            / max(1, recommended_officers)
+            * 100
+            )
+
+            coverage_patrols = (
+                available_patrols
+                / max(1, recommended_patrols)
+                * 100
+            )
+
+            coverage_tows = (
+                available_tows
+                / max(1, recommended_tows)
+                * 100
+            )
+
+
+            c1,c2,c3 = st.columns(3)
+
+            c1.metric(
+                "Officer Coverage",
+                f"{coverage_officers:.1f}%"
+            )
+
+            c2.metric(
+                "Patrol Coverage",
+                f"{coverage_patrols:.1f}%"
+            )
+
+            c3.metric(
+                "Tow Coverage",
+                f"{coverage_tows:.1f}%"
+            )
+
+            overall_coverage = min(
+                coverage_officers,
+                coverage_patrols,
+                coverage_tows
+            )
+
+            if overall_coverage >= 90:
+                st.success(
+                    f"Resources Sufficient ({overall_coverage:.1f}% coverage)"
+                )
+
+            elif overall_coverage >= 70:
+                st.warning(
+                    f"Resources Partially Sufficient ({overall_coverage:.1f}% coverage)"
+                )
+
+            else:
+                st.error(
+                    f"Resources Insufficient ({overall_coverage:.1f}% coverage)"
+                )
+
+
+            officer_shortage = max(
+                                0,
+                                recommended_officers - available_officers
+                            )
+            
+            patrol_shortage = max(
+                                0,
+                                recommended_patrols - available_patrols
+                            )
+            
+            tow_shortage = max(
+                                0,
+                                recommended_tows - available_tows
+                            )
+            
+            if officer_shortage > 0:
+                                            st.warning(
+                                                f"Officer shortage: {officer_shortage}"
+                                            )
+                        
+            if patrol_shortage > 0:
+                                            st.warning(
+                                                f"Patrol shortage: {patrol_shortage}"
+                                            )
+                        
+            if tow_shortage > 0:
+                                            st.warning(
+                                                f"Tow shortage: {tow_shortage}"
+                                            )
+            
+            deployment["Expected Action"] = deployment["action"]    
+            
+            deployment["impact_score"] = (
+                            deployment["allocated_officers"] * 0.4
+                                + deployment["allocated_tows"] * 0.4
+                                + deployment["allocated_patrols"] * 0.2
+                            )
+            
+            estimated_reduction = min(
+                                60,
+                                deployment["impact_score"].sum() * 1.5
+                            )
+            
+            avg_risk_before = (
+                                display_preds["hotspot_prob"]
+                                .mean() * 100
+                            )
+            
+            avg_risk_after = max(
+                                0,
+                                avg_risk_before - estimated_reduction
+                            )
+            
+            st.subheader(
+                                "Risk Comparison"
+                            )
+            
+            c1,c2 = st.columns(2)
+            
+            c1.metric(
+                                "Average Risk Before Deployment",
+                                f"{avg_risk_before:.1f}%"
+                            )
+            
+            c2.metric(
+                                "Expected Risk After Deployment",
+                                f"{avg_risk_after:.1f}%"
+                            )
+            
+                            
+            
+            st.subheader("Optimized Deployment Plan")
+            
+            st.dataframe(
+                                deployment[[
+                                    "Deployment Rank",
+                                    "top_station",
+                                    "priority",
+                                    "Risk %",
+                                    "Expected Action",
+                                    "allocated_officers",
+                                    "allocated_patrols",
+                                    "allocated_tows",
+                                    "deployment_window"
+                                ]],
+                                width="stretch"
+                            )
+            
+                            
+            
+            st.download_button(
+                                "⬇️ Download Deployment Plan",
+                                deployment.to_csv(index=False),
+                                "deployment_plan.csv",
+                                "text/csv"
+                            )
+            
+            st.success(
+                                    f"""
+                                Deployment Summary
+            
+                                Zones Covered: {len(deployment)}
+            
+                                Officers Assigned: {deployment['allocated_officers'].sum()}
+            
+                                Patrol Vehicles Assigned: {deployment['allocated_patrols'].sum()}
+            
+                                Tow Trucks Assigned: {deployment['allocated_tows'].sum()}
+            
+                                Expected Congestion Reduction: {estimated_reduction:.1f}%
+            
+                                Highest Priority Zone: {deployment.iloc[0]['top_station']}
+                                """
+                            )
+            
+            st.subheader(
+                                "Top 5 Immediate Action Zones"
+                            )
+            
+            st.dataframe(
+                                deployment.head(5)[[
+                                    "Deployment Rank",
+                                    "top_station",
+                                    "priority",
+                                    "Risk %",
+                                    "allocated_officers",
+                                    "allocated_patrols",
+                                    "allocated_tows"
+                                ]]
+                            )
+            
 
         export_cols = [
             "hex8",
